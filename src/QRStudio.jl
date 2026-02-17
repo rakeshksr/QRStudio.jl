@@ -12,10 +12,19 @@ import FileIO: load
 QML_DIR = Base.pkgdir(@__MODULE__, "qml")
 # QML_DIR = joinpath(dirname(@__DIR__), "qml")
 
-@kwdef struct Detection
-    content::String
-    format::String
-end
+
+# @kwdef struct Detection
+#     content::String
+#     format::String
+#     top_left_x::Int
+#     top_left_y::Int
+#     top_right_x::Int
+#     top_right_y::Int
+#     bottom_right_x::Int
+#     bottom_right_y::Int
+#     bottom_left_x::Int
+#     bottom_left_y::Int
+# end
 
 function create_barcode_image(content::String, barcode_format::ZXing_BarcodeFormat; kwargs...)
     co = CreatorOptions(barcode_format)
@@ -61,20 +70,34 @@ function detect(image_path::AbstractString)
     for bc in bcs
         content = text(bc)
         fmt = unsafe_string(ZXing_BarcodeFormatToString(format(bc)))
-        push!(result, [content, fmt])
+        pos = ZXingCPP.position(bc)
+        # To-Do replace Array with Struct
+        # det = Detection(
+        #     content,
+        #     fmt,
+        #     pos.topLeft.x,
+        #     pos.topLeft.y,
+        #     pos.topRight.x,
+        #     pos.topRight.y,
+        #     pos.bottomRight.x,
+        #     pos.bottomRight.y,
+        #     pos.bottomLeft.x,
+        #     pos.bottomLeft.y,
+        # )
+        det = [
+            content,
+            fmt,
+            pos.topLeft.x,
+            pos.topLeft.y,
+            pos.topRight.x,
+            pos.topRight.y,
+            pos.bottomRight.x,
+            pos.bottomRight.y,
+            pos.bottomLeft.x,
+            pos.bottomLeft.y,
+        ]
+        push!(result, det)
     end
-    # result = [
-    #     JuliaItemModel(
-    #         Detection(
-    #             content = text(bc),
-    #             format = string(format(bc))
-    #         )
-    #     ),
-    #     # Dict(
-    #     #     "content" => text(bc)
-    #     # ),
-    # ]
-
     return result
 end
 
@@ -84,6 +107,8 @@ function @main(ARGS)
     @qmlfunction detect barcode_display
 
     qml_file = joinpath(QML_DIR, "main.qml")
+    # detectionsModel = JuliaItemModel(detections)
+    # loadqml(qml_file; detectionsModel)
     loadqml(qml_file)
 
     return exec()
