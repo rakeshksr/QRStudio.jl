@@ -105,6 +105,7 @@ Pane {
                 }
             }
             Button {
+                id: qrGenerateButton
                 icon.source: "images/qr_code_2.svg"
                 text: "Generate"
                 highlighted: true
@@ -115,14 +116,17 @@ Pane {
                         const s = Julia.barcode_display(generatedImageDisp, content, barcodeFormats.currentText)
                         generatedImageDisp.height = s[0]
                         generatedImageDisp.width = s[1]
+                        qrDownloadButton.visible = true
                     } else {
                         emptyContentDialog.open()
                     }
                 }
             }
             Button {
+                id: qrDownloadButton
                 icon.source: "images/download.svg"
                 text: "Save"
+                visible: false
                 highlighted: true
                 Material.background: Material.Pink
                 onClicked: {
