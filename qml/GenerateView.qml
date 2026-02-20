@@ -105,7 +105,7 @@ Pane {
                 }
             }
             Button {
-                icon.source: "images/qr_code_2_add.png"
+                icon.source: "images/qr_code_2.svg"
                 text: "Generate"
                 highlighted: true
                 Material.background: Material.Pink
@@ -121,7 +121,7 @@ Pane {
                 }
             }
             Button {
-                icon.source: "images/download.png"
+                icon.source: "images/download.svg"
                 text: "Save"
                 highlighted: true
                 Material.background: Material.Pink

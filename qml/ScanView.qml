@@ -114,11 +114,11 @@ Pane {
             onTapped: fileDialog.open()
         }
 
-         ColumnLayout {
+         RowLayout {
             anchors.centerIn: parent
             spacing: 10
             Image {
-                source: "images/add_photo_alternate.png"
+                source: "images/add_photo_alternate.svg"
                 fillMode: Image.PreserveAspectFit
             }
 
@@ -271,7 +271,7 @@ Pane {
                 spacing: 20
 
                 Button {
-                    icon.source: "images/delete_sweep.png"
+                    icon.source: "images/delete_sweep.svg"
                     text: "Clear"
                     highlighted: true
                     Material.background: Material.Orange

@@ -40,15 +40,15 @@ ApplicationWindow {
             Layout.margins: 10
             TabButton {
                 text: "Scan"
-                icon.source: "images/qr_code_scanner.png"
+                icon.source: "images/qr_code_scanner.svg"
             }
             TabButton {
                 text: "Generate"
-                icon.source: "images/qr_code_2_add.png"
+                icon.source: "images/qr_code_2_add.svg"
             }
             TabButton {
                 text: "Settings"
-                icon.source: "images/settings.png"
+                icon.source: "images/settings.svg"
             }
         }
 
