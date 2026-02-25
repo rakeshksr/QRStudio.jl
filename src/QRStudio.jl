@@ -1,13 +1,30 @@
 module QRStudio
 
-using QML
-import ZXingCPP: ZXing_BarcodeFormatToString, format, read_barcodes, text
-using ZXingCPP
-
-using ImageCore
-import ImageShow
-import ImageIO
 import FileIO: load
+import ImageCore
+import ImageIO
+import ImageShow
+
+import QML:
+    @qmlfunction,
+    JuliaDisplay,
+    QString,
+    exec,
+    loadqml
+
+import ZXingCPP:
+    Barcode,
+    CreatorOptions,
+    WriterOptions,
+    ZXing_BarcodeFormat,
+    ZXing_BarcodeFormatFromString,
+    ZXing_BarcodeFormatToString,
+    ZXing_BarcodeFormat_QRCode,
+    format,
+    position,
+    read_barcodes,
+    text,
+    write_barcode_to_image
 
 QML_DIR = Base.pkgdir(@__MODULE__, "qml")
 # QML_DIR = joinpath(dirname(@__DIR__), "qml")
@@ -38,14 +55,7 @@ function create_barcode_image(content::String, barcode_format::ZXing_BarcodeForm
     wo = WriterOptions(; scale = scale)
     # wo = WriterOptions(; kwargs...)
     zimg = write_barcode_to_image(bc, wo)
-
-    # img = Matrix(zimg)
-    #
-    d = ZXingCPP.data(zimg)
-    nv = normedview(d)
-    pimg = permutedims(nv)
-    img = Gray.(pimg)
-
+    img = Matrix(zimg)
     return img
 end
 
@@ -70,7 +80,7 @@ function detect(image_path::AbstractString)
     for bc in bcs
         content = text(bc)
         fmt = unsafe_string(ZXing_BarcodeFormatToString(format(bc)))
-        pos = ZXingCPP.position(bc)
+        pos = position(bc)
         # To-Do replace Array with Struct
         # det = Detection(
         #     content,
