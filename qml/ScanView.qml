@@ -10,7 +10,7 @@ import jlqml
 Pane {
     id: scanRoot
 
-    Material.elevation: 5
+    Material.elevation: 0
     Material.roundedScale: Material.SmallScale
 
     property bool showDropZone: true
@@ -130,7 +130,7 @@ Pane {
         id: dropZone
         anchors.fill: parent
         color: dropArea.containsDrag ? Qt.alpha(Material.accent, 0.1) : "transparent"
-        border.color: dropArea.containsDrag ? Material.accent : Material.hintTextColor
+        border.color: Material.accent
         border.width: 2
         radius: 10
 
@@ -204,7 +204,7 @@ Pane {
         anchors.fill: parent
         visible: !showDropZone
         radius: 8
-        color: "transparent"
+        color: Qt.alpha(Material.accent, 0.03)
 
         ColumnLayout {
             anchors.fill: parent
