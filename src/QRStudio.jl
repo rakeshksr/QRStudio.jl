@@ -112,7 +112,7 @@ function detect(image_path::AbstractString)
 end
 
 
-function @main(ARGS)
+function (@main)(ARGS)
 
     @qmlfunction detect barcode_display
 

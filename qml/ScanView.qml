@@ -14,25 +14,18 @@ Pane {
     Material.roundedScale: Material.SmallScale
 
     property bool showDropZone: true
-
     property int activeIndex: -1
+    property bool isProcessing: false
 
+    // Model for all selected images and their detection results
+    ListModel {
+        id: imagesModel
+        // Structure: ListElement { path: "", detections: [] }
+    }
+
+    // Model for detections of the currently active image
     ListModel {
         id: detectionsModel
-
-        ListElement {
-            content: ""
-            format: ""
-            topLeftX: 0
-            topLeftY: 0
-            topRightX: 0
-            topRightY: 0
-            bottomRightX: 0
-            bottomRightY: 0
-            bottomLeftX: 0
-            bottomLeftY: 0
-        }
-
         Component.onCompleted: clear()
     }
 
@@ -41,34 +34,67 @@ Pane {
         return decodeURIComponent(url).replace(/^(file:\/{2,3})/, "");
     }
 
-    function detect(url) {
-        const imagePath = toLocalFile(url);
-        const res = Julia.detect(imagePath);
-        if (res.length === 0) {
-            noResultDialog.open()
-            return
-        }
+    function detect(urls) {
+        if (urls.length === 0) return;
+        scanRoot.isProcessing = true;
+
+        Qt.callLater(() => {
+            imagesModel.clear();
+            detectionsModel.clear();
+            scanRoot.activeIndex = -1;
+
+            for (const url of urls) {
+                const imagePath = toLocalFile(url);
+                const detections = Julia.detect(imagePath);
+                let imageDetections = [];
+                 // To-Do replace detections array with julia struct
+                for (const detection of detections) {
+                    imageDetections.push({
+                        "content": detection[0],
+                        "format": detection[1],
+                        "topLeftX": detection[2],
+                        "topLeftY": detection[3],
+                        "topRightX": detection[4],
+                        "topRightY": detection[5],
+                        "bottomRightX": detection[6],
+                        "bottomRightY": detection[7],
+                        "bottomLeftX": detection[8],
+                        "bottomLeftY": detection[9]
+                    });
+                }
+                imagesModel.append({
+                    "path": url,
+                    "detections": imageDetections
+                });
+            }
+
+            scanRoot.isProcessing = false;
+
+            let totalDetections = 0;
+            for (let k = 0; k < imagesModel.count; k++) {
+                totalDetections += imagesModel.get(k).detections.count;
+            }
+
+            if (totalDetections === 0) {
+                noResultDialog.open();
+                imagesModel.clear();
+                return;
+            }
+            showDropZone = false;
+        });
+    }
+
+    function loadActiveImageDetections(imageIndex) {
         detectionsModel.clear();
         scanRoot.activeIndex = -1;
+        detailsDrawer.close();
 
-        // To-Do replace res array with julia struct
-        for (var i = 0; i < res.length; i++) {
-            detectionsModel.append({
-                "content": res[i][0],
-                "format": res[i][1],
-                "topLeftX": res[i][2],
-                "topLeftY": res[i][3],
-                "topRightX": res[i][4],
-                "topRightY": res[i][5],
-                "bottomRightX": res[i][6],
-                "bottomRightY": res[i][7],
-                "bottomLeftX": res[i][8],
-                "bottomLeftY": res[i][9]
-            });
+        if (imageIndex >= 0 && imageIndex < imagesModel.count) {
+            const currentItem = imagesModel.get(imageIndex);
+            for (let i = 0; i < currentItem.detections.count; i++) {
+                detectionsModel.append(currentItem.detections.get(i));
+            }
         }
-
-        showDropZone = false
-        uploadImage.source = url
     }
 
     Dialog {
@@ -90,13 +116,13 @@ Pane {
     }
 
     FileDialog {
-        //  To-Do accept multiple images
         id: fileDialog
-        title: "Please choose a barcode image"
+        title: "Please choose barcode image(s)"
         // currentFolder: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
         nameFilters: ["Image files (*.png *.jpg *.jpeg)"]
+        fileMode: FileDialog.OpenFiles
         onAccepted: {
-            detect(fileDialog.selectedFile)
+            detect(fileDialog.selectedFiles)
         }
     }
 
@@ -124,7 +150,7 @@ Pane {
 
             Label {
                 id: dropLabel
-                text: dropArea.containsDrag ? "Drop image here" : "Drag an image file here, or click to upload"
+                text: dropArea.containsDrag ? "Drop images here" : "Drag an image files here, or click to upload"
                 font.pixelSize: 18
                 color: dropArea.containsDrag ? Material.accent : Material.secondaryTextColor
             }
@@ -134,25 +160,40 @@ Pane {
             id: dropArea
             anchors.fill: parent
 
-            //  To-Do accept multiple images
-
             function isImageFile(url) {
                 return url.toString().toLowerCase().match(/\.(png|jpe?g)$/);
             }
 
             onEntered: (drag) => {
-                if (!drag.hasUrls || drag.urls.length !== 1 || !isImageFile(drag.urls[0])) {
-                    drag.accepted = false
+                if (drag.hasUrls) {
+                    let hasValidImage = false;
+                    for (const dragUrl of drag.urls) {
+                        if (isImageFile(dragUrl)) {
+                            hasValidImage = true;
+                            break;
+                        }
+                    }
+                    drag.accepted = hasValidImage;
+                } else {
+                    drag.accepted = false;
                 }
             }
 
             onDropped: (drop) => {
-                if (drop.hasUrls && drop.urls.length === 1 && isImageFile(drop.urls[0])) {
-                    detect(drop.urls[0])
-                    drop.acceptProposedAction()
-                } else {
-                    drop.accepted = false
-                    console.warn("Multiple files or invalid items rejected.")
+                if (drop.hasUrls) {
+                    let validUrls = [];
+                    for (const dropUrl of drop.urls){
+                        if(isImageFile(dropUrl)) {
+                            validUrls.push(dropUrl);
+                        }
+                    }
+                    if(validUrls.length > 0) {
+                        detect(validUrls);
+                        drop.acceptProposedAction();
+                    } else {
+                        drop.accepted = false;
+                        toast.show("No valid image files found in selection.");
+                    }
                 }
             }
         }
@@ -173,114 +214,219 @@ Pane {
             Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.preferredHeight: 80
 
-                Rectangle {
+                SwipeView {
+                    id: swipeView
                     anchors.fill: parent
-                    color: "transparent"
-                    border.color: Material.color(Material.LightBlue)
-                    border.width: 2
-                    radius: 6
+                    clip: true
+
+                    onCurrentIndexChanged: {
+                        loadActiveImageDetections(swipeView.currentIndex);
+                    }
+
+                    Repeater {
+                        id: imageRepeater
+                        model: imagesModel
+
+                        Item {
+                            id: carouselPageRoot
+                            readonly property real distance: Math.abs(index - swipeView.currentIndex)
+                            readonly property real relativePosition: Math.min(distance, 1.0)
+                            Image {
+                                id: uploadImage
+                                anchors.fill: parent
+                                anchors.margins: 40
+                                fillMode: Image.PreserveAspectFit
+                                source: model.path
+
+                                // Carousel Visuals
+                                scale: 1.0 - (relativePosition * 0.15)
+                                opacity: 1.0 - (relativePosition * 0.6)
+                                Behavior on scale {
+                                    NumberAnimation {
+                                        duration: 200
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+                                Behavior on opacity { NumberAnimation { duration: 200 } }
+
+                                ToolTip {
+                                    id: detectionToolTip
+                                    visible: (swipeView.currentIndex === index) && (scanRoot.activeIndex !== -1) && (!detailsDrawer.opened)
+                                    parent: canvas
+                                    text: scanRoot.activeIndex !== -1 ? detectionsModel.get(scanRoot.activeIndex).content : ""
+
+                                    property var mappedPos: uploadImage.mapToItem(canvas, globalHover.point.position.x, globalHover.point.position.y)
+                                    x: mappedPos.x
+                                    y: mappedPos.y - 40
+                                    z: 100
+
+                                    enter: Transition {
+                                        NumberAnimation {
+                                            property: "opacity"
+                                            from: 0
+                                            to: 1
+                                            duration: 100
+                                        }
+                                    }
+                                    exit: Transition {
+                                        NumberAnimation {
+                                            property: "opacity"
+                                            from: 1
+                                            to: 0
+                                            duration: 100
+                                        }
+                                    }
+                                }
+
+                                Item {
+                                    id: canvas
+                                    x: (uploadImage.width - uploadImage.paintedWidth) / 2
+                                    y: (uploadImage.height - uploadImage.paintedHeight) / 2
+                                    width: uploadImage.paintedWidth
+                                    height: uploadImage.paintedHeight
+
+                                    readonly property real scaleX: width / uploadImage.sourceSize.width
+                                    readonly property real scaleY: height / uploadImage.sourceSize.height
+
+                                    Repeater {
+                                        id: polygonRepeater
+                                        model: detectionsModel
+                                        Shape {
+                                            anchors.fill: parent
+                                            layer.enabled: true
+                                            layer.samples: 4
+
+                                            readonly property bool isActive: index === scanRoot.activeIndex
+
+                                            ShapePath {
+                                                strokeColor: isActive ? "yellow" : "cyan"
+                                                strokeWidth: isActive ? 4 : 2
+                                                fillColor: isActive ? Qt.rgba(1, 1, 0, 0.3) : Qt.rgba(0, 1, 1, 0.1)
+
+                                                startX: model.topLeftX * canvas.scaleX
+                                                startY: model.topLeftY * canvas.scaleY
+
+                                                PathLine {
+                                                    x: model.topRightX * canvas.scaleX
+                                                    y: model.topRightY * canvas.scaleY
+                                                }
+                                                PathLine {
+                                                    x: model.bottomRightX * canvas.scaleX
+                                                    y: model.bottomRightY * canvas.scaleY
+                                                }
+                                                PathLine {
+                                                    x: model.bottomLeftX * canvas.scaleX
+                                                    y: model.bottomLeftY * canvas.scaleY
+                                                }
+                                                PathLine {
+                                                    x: model.topLeftX * canvas.scaleX
+                                                    y: model.topLeftY * canvas.scaleY
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                HoverHandler {
+                                    id: globalHover
+                                    onPointChanged: {
+                                        if (detailsDrawer.opened) return;
+
+                                        let pos = uploadImage.mapToItem(canvas, point.position.x, point.position.y);
+
+                                        let foundIndex = -1;
+                                        for (let i = detectionsModel.count - 1; i >= 0; i--) {
+                                            if (isPointInPolygon(pos.x, pos.y, detectionsModel.get(i), canvas)) {
+                                                foundIndex = i;
+                                                break;
+                                            }
+                                        }
+                                        scanRoot.activeIndex = foundIndex;
+                                    }
+                                }
+
+                                TapHandler {
+                                    onTapped: {
+                                        if (scanRoot.activeIndex !== -1) {
+                                            detailsDrawer.open();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
-                Image {
-                    id: uploadImage
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    fillMode: Image.PreserveAspectFit
+                ToolButton {
+                    id: leftArrow
+                    anchors.left: parent.left
+                    anchors.verticalCenter: swipeView.verticalCenter
+                    anchors.leftMargin: 5
+                    icon.source: "images/arrow_back_ios.svg"
+                    z: 10
+                    visible: swipeView.currentIndex > 0
+                    onClicked: swipeView.decrementCurrentIndex()
+                    Material.background: Qt.rgba(0,0,0,0.5)
+                }
 
-                    Item {
-                        id: canvas
-                        x: (uploadImage.width - uploadImage.paintedWidth) / 2
-                        y: (uploadImage.height - uploadImage.paintedHeight) / 2
-                        width: uploadImage.paintedWidth
-                        height: uploadImage.paintedHeight
+                ToolButton {
+                    id: rightArrow
+                    anchors.right: parent.right
+                    anchors.verticalCenter: swipeView.verticalCenter
+                    anchors.rightMargin: 5
+                    icon.source: "images/arrow_forward_ios.svg"
+                    z: 10
+                    visible: swipeView.currentIndex < imagesModel.count - 1
+                    onClicked: swipeView.incrementCurrentIndex()
+                    Material.background: Qt.rgba(0,0,0,0.5)
+                }
+            }
 
-                        readonly property real scaleX: width / uploadImage.sourceSize.width
-                        readonly property real scaleY: height / uploadImage.sourceSize.height
+            PageIndicator {
+                id: controlIndicator
+                count: swipeView.count
+                currentIndex: swipeView.currentIndex
+                Layout.alignment: Qt.AlignHCenter
+                visible: count > 1
+                contentItem: Row {
+                    spacing: 12
+                    Repeater {
+                        model: controlIndicator.count
+                        Rectangle {
+                            width: 12
+                            height: 12
+                            radius: 6
+                            color: index === controlIndicator.currentIndex ? Material.accent : Material.hintTextColor
+                            opacity: index === controlIndicator.currentIndex ? 1.0 : 0.3
 
-                        Repeater {
-                            model: detectionsModel
+                            Behavior on opacity { OpacityAnimator { duration: 150 }}
+                            Behavior on color { ColorAnimation { duration: 150 }}
 
-                            Shape {
+                            MouseArea {
                                 anchors.fill: parent
-                                layer.enabled: true
-                                layer.samples: 4
-
-                                readonly property bool isActive: index === scanRoot.activeIndex
-
-                                ShapePath {
-                                    strokeColor: isActive ? "yellow" : "cyan"
-                                    strokeWidth: isActive ? 4 : 2
-                                    fillColor: isActive ? Qt.rgba(1, 1, 0, 0.3) : Qt.rgba(0, 1, 1, 0.1)
-
-                                    startX: model.topLeftX * canvas.scaleX
-                                    startY: model.topLeftY * canvas.scaleY
-
-                                    PathLine { x: model.topRightX * canvas.scaleX; y: model.topRightY * canvas.scaleY }
-                                    PathLine { x: model.bottomRightX * canvas.scaleX; y: model.bottomRightY * canvas.scaleY }
-                                    PathLine { x: model.bottomLeftX * canvas.scaleX; y: model.bottomLeftY * canvas.scaleY }
-                                    PathLine { x: model.topLeftX * canvas.scaleX; y: model.topLeftY * canvas.scaleY }
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    swipeView.currentIndex = index
                                 }
                             }
                         }
-                    }
-
-                    HoverHandler {
-                        id: globalHover
-                        onPointChanged: {
-                            if (detailsDrawer.opened) return;
-
-                            // let pos = point.position
-                            let pos = uploadImage.mapToItem(canvas, point.position.x, point.position.y);
-
-                            let foundIndex = -1
-                            for (let i = detectionsModel.count - 1; i >= 0; i--) {
-                                if (isPointInPolygon(pos.x, pos.y, detectionsModel.get(i))) {
-                                    foundIndex = i
-                                    break
-                                }
-                            }
-                            scanRoot.activeIndex = foundIndex
-                        }
-                    }
-
-                    TapHandler {
-                        onTapped: {
-                            if (scanRoot.activeIndex !== -1) {
-                                detailsDrawer.open()
-                            }
-                        }
-                    }
-
-                    ToolTip {
-                        visible: scanRoot.activeIndex !== -1 && !detailsDrawer.opened
-                        text: scanRoot.activeIndex !== -1 ? detectionsModel.get(scanRoot.activeIndex).content : ""
-                        x: globalHover.point.position.x
-                        y: globalHover.point.position.y - 35
                     }
                 }
             }
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredHeight: 20
-                Layout.leftMargin: 10
-                Layout.rightMargin: 10
-                spacing: 20
-
-                Button {
-                    icon.source: "images/delete_sweep.svg"
-                    text: "Clear"
-                    highlighted: true
-                    Material.background: Material.Orange
-                    onClicked: {
-                        showDropZone = true
-                        detectionsModel.clear()
-                        scanRoot.activeIndex = -1
-                        uploadImage.source = ""
-                    }
+            Button {
+                icon.source: "images/delete_sweep.svg"
+                text: qsTr("Clear All")
+                highlighted: true
+                Material.background: Material.Orange
+                Layout.alignment: Qt.AlignRight
+                onClicked: {
+                    showDropZone = true;
+                    imagesModel.clear();
+                    detectionsModel.clear();
+                    scanRoot.activeIndex = -1;
+                    detailsDrawer.close();
                 }
             }
         }
@@ -288,11 +434,19 @@ Pane {
 
     Drawer {
         id: detailsDrawer
-        width: 350
+        width: Math.min(400, parent.width * 0.9)
         height: parent.height
         edge: Qt.RightEdge
-        background: Rectangle { color: "#252525"; border.color: "#333" }
 
+        background: Rectangle {
+            color: Material.dialogColor
+            Rectangle {
+                anchors.left: parent.left
+                width: 1
+                height: parent.height
+                color: Qt.rgba(1, 1, 1, 0.1)
+            }
+        }
 
         property var d: scanRoot.activeIndex !== -1 ? detectionsModel.get(scanRoot.activeIndex) : null
 
@@ -301,17 +455,26 @@ Pane {
             anchors.margins: 25
             spacing: 20
 
-            Label {
-                text: "Object Details"
-                font.pixelSize: 24
-                color: "white"
-                font.bold: true
+            RowLayout {
+                Layout.fillWidth: true
+                Label {
+                    text: "Detection Details"
+                    font.pixelSize: 22
+                    font.weight: Font.DemiBold
+                    color: Material.accent
+                    Layout.fillWidth: true
+                }
+                ToolButton {
+                    icon.source: "images/close.svg"
+                    onClicked: detailsDrawer.close()
+                }
             }
 
             Rectangle {
                 Layout.fillWidth: true
                 height: 1
-                color: "#444"
+                color: Material.dividerColor
+                opacity: 0.5
             }
 
             Column {
@@ -320,41 +483,44 @@ Pane {
 
                 DetailRow {
                     label: "Type"
-                    value: detailsDrawer.d ? detailsDrawer.d.format : "-"
+                    value: detailsDrawer.d ? detailsDrawer.d.format : "Unknown"
                 }
 
                 Label {
                     text: "Decoded Content:"
-                    color: "#888"
+                    font.weight: Font.Medium
+                    color: Material.secondaryTextColor
                     topPadding: 10
                 }
 
                 ScrollView {
                     width: parent.width
-                    // Layout.fillWidth: true
-                    height: 200
+                    height: 250
                     clip: true
-
                     ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
                     TextArea {
                         id: detailsText
                         text: detailsDrawer.d ? detailsDrawer.d.content : ""
                         readOnly: true
                         wrapMode: Text.WordWrap
-                        color: "cyan"
-                        font.family: "Monospace"
-                        font.pixelSize: 13
+                        color: Material.accent
+                        font.family: "JetBrains Mono, Cascadia Code, Monospace"
+                        font.pixelSize: 14
+                        selectByMouse: true
 
                         verticalAlignment: Text.AlignTop
-
                         leftPadding: 10
                         rightPadding: 10
                         topPadding: 10
                         bottomPadding: 10
-
-                        background: Rectangle { color: "#1a1a1a"; radius: 4 }
                         padding: 10
-                        selectByMouse: true
+
+                        background: Rectangle {
+                            color: Qt.alpha(Material.accent, 0.05)
+                            radius: 12
+                            border.color: Qt.alpha(Material.accent, 0.2)
+                        }
                     }
                 }
             }
@@ -362,38 +528,33 @@ Pane {
             Item { Layout.fillHeight: true }
 
             Button {
-                text: "Copy Content"
+                text: "Copy to Clipboard"
                 Layout.fillWidth: true
                 highlighted: true
                 enabled: detailsDrawer.d !== null
+                icon.source: "images/content_copy.svg"
                 onClicked: {
                     tempClipboard.text = detailsDrawer.d.content
                     tempClipboard.selectAll()
                     tempClipboard.copy()
-                    toast.show("Content copied to clipboard")
+                    toast.show("Copied to clipboard")
                 }
-            }
-
-            Button {
-                text: "Close"
-                Layout.fillWidth: true
-                onClicked: detailsDrawer.close()
             }
         }
     }
 
-    function isPointInPolygon(px, py, item) {
+    function isPointInPolygon(px, py, item, currentCanvas) {
         const x = [
-            item.topLeftX * canvas.scaleX,
-            item.topRightX * canvas.scaleX,
-            item.bottomRightX * canvas.scaleX,
-            item.bottomLeftX * canvas.scaleX
+            item.topLeftX * currentCanvas.scaleX,
+            item.topRightX * currentCanvas.scaleX,
+            item.bottomRightX * currentCanvas.scaleX,
+            item.bottomLeftX * currentCanvas.scaleX
         ];
         const y = [
-            item.topLeftY * canvas.scaleY,
-            item.topRightY * canvas.scaleY,
-            item.bottomRightY * canvas.scaleY,
-            item.bottomLeftY * canvas.scaleY
+            item.topLeftY * currentCanvas.scaleY,
+            item.topRightY * currentCanvas.scaleY,
+            item.bottomRightY * currentCanvas.scaleY,
+            item.bottomLeftY * currentCanvas.scaleY
         ];
 
         let inside = false;
@@ -409,23 +570,84 @@ Pane {
         return inside;
     }
 
-    TextEdit { id: tempClipboard; visible: false }
+    TextEdit {
+        id: tempClipboard
+        visible: false
+    }
 
     Popup {
         id: toast
-        x: (parent.width - width) / 2; y: parent.height - 60
-        width: 300; height: 40
-        background: Rectangle { color: "#333"; radius: 20; border.color: "cyan" }
-        contentItem: Label { id: tText; color: "white"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-        function show(m) { tText.text = m; open(); tTimer.restart(); }
-        Timer { id: tTimer; interval: 2500; onTriggered: toast.close() }
+        x: (parent.width - width) / 2
+        y: parent.height - 60
+        width: 300
+        height: 40
+        background: Rectangle {
+            color: "#333"
+            radius: 20
+            border.color: "cyan"
+        }
+        contentItem: Label {
+            id: tText
+            color: "white"
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+        function show(m) {
+            tText.text = m;
+            open();
+            tTimer.restart();
+        }
+        Timer {
+            id: tTimer;
+            interval: 2500;
+            onTriggered: toast.close()
+        }
+    }
+
+    Rectangle {
+        id: loadingIndicator
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.4)
+        visible: scanRoot.isProcessing
+        z: 2000
+
+        MouseArea { anchors.fill: parent }
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 15
+
+            BusyIndicator {
+                id: progressCircle
+                running: scanRoot.isProcessing
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Label {
+                text: "Analyzing Images..."
+                color: "white"
+                font.pixelSize: 16
+                font.weight: Font.Medium
+                Layout.alignment: Qt.AlignHCenter
+            }
+        }
     }
 
     component DetailRow : Row {
         property string label: ""
         property string value: ""
         spacing: 10
-        Text { text: label + ":"; color: "#888"; width: 100; font.pixelSize: 14 }
-        Text { text: value; color: "white"; font.bold: true; font.pixelSize: 14 }
+        Text {
+            text: label + ":"
+            color: "#888"
+            width: 100
+            font.pixelSize: 14
+        }
+        Text {
+            text: value
+            color: Material.accent
+            font.bold: true
+            font.pixelSize: 14
+        }
     }
 }
