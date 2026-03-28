@@ -1,7 +1,7 @@
 module QRStudio
 
 import FileIO: load
-import ImageCore
+import ImageCore: N0f8, RGBA
 import ImageIO
 import ImageShow
 
@@ -72,6 +72,11 @@ function barcode_display(d::JuliaDisplay, content::QString, barcode_format::QStr
     return [h, w]
 end
 
+function clear_julia_display(d::JuliaDisplay)
+    empty_img = zeros(RGBA{N0f8}, 300, 300)
+    return display(d, empty_img)
+end
+
 
 function detect(image_path::AbstractString)
     img = load(image_path)
@@ -114,7 +119,7 @@ end
 
 function (@main)(ARGS)
 
-    @qmlfunction detect barcode_display
+    @qmlfunction detect barcode_display clear_julia_display
 
     qml_file = joinpath(QML_DIR, "main.qml")
     # detectionsModel = JuliaItemModel(detections)

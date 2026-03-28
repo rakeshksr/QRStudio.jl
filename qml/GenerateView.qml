@@ -7,9 +7,10 @@ import jlqml
 
 Pane {
     id: generateRoot
+    Material.elevation: 0
+    padding: 20
 
-    Material.elevation: 5
-    Material.roundedScale: Material.SmallScale
+    property bool hasImage: false
 
     FileDialog {
         id: generatedImageSaveDialog
@@ -18,7 +19,7 @@ Pane {
 
         onAccepted: {
             generatedImageDisp.grabToImage(function(result) {
-                result.saveToFile(selectedFile)
+                result.saveToFile(selectedFile);
             })
         }
     }
@@ -30,107 +31,143 @@ Pane {
         parent: Overlay.overlay
         modal: true
         standardButtons: Dialog.Ok
-        ColumnLayout {
-            spacing: 12
-            Label {
-                text: "Content should not be empty"
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                Layout.alignment: Qt.AlignHCenter
-            }
+        Label {
+            text: "Please enter some content to generate a barcode."
+            wrapMode: Text.WordWrap
         }
     }
 
     ColumnLayout {
-        anchors.centerIn: parent
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 0
+        spacing: 24
 
-        Item {
+        Rectangle {
+            id: previewContainer
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredHeight: 80
+            Layout.minimumHeight: 320
 
-            Rectangle {
-                anchors.fill: parent
-                color: "transparent"
-                border.color: Material.color(Material.LightBlue)
-                border.width: 2
-                radius: 6
+            color: Qt.alpha(Material.accent, 0.03)
+            radius: 16
+            border.color: Material.dividerColor
+            border.width: 1
+
+            Label {
+                anchors.centerIn: parent
+                text: "Your barcode will appear here"
+                color: Material.hintTextColor
+                visible: !generateRoot.hasImage
+                font.pixelSize: 16
             }
 
             JuliaDisplay {
                 id: generatedImageDisp
                 anchors.centerIn: parent
-                height: 300
-                width: 300
+                // The size is dynamically set by Julia
+                opacity: generateRoot.hasImage ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: 250 } }
             }
         }
 
-        RowLayout {
+        Rectangle {
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.preferredHeight: 20
-            Layout.leftMargin: 10
-            Layout.rightMargin: 10
-            spacing: 20
+            Layout.preferredHeight: 180
+            color: Material.dialogColor
+            radius: 16
+            border.color: Material.dividerColor
 
-            ComboBox {
-                id: barcodeFormats
-                model: [
-                    "Aztec", "Codabar", "Code39", "Code93", "Code128",
-                    "DataBar", "DataBarExpanded", "DataMatrix", "EAN8",
-                    "EAN13", "ITF", "MaxiCode", "PDF417", "QRCode",
-                    "UPCA", "UPCE", "MicroQRCode", "RMQRCode", "DXFilmEdge",
-                    "DataBarLimited", "LinearCodes", "MatrixCodes",
-                ]
-                Component.onCompleted: currentIndex = find("QRCode")
-                Layout.preferredWidth: 150
-            }
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 16
 
-            ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+                RowLayout {
+                    spacing: 16
 
-                ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                    ComboBox {
+                        id: barcodeFormats
+                        Layout.preferredWidth: 200
+                        enabled: !generateRoot.hasImage
+                        model: [
+                            "Aztec", "Codabar", "Code39", "Code93", "Code128",
+                            "DataBar", "DataBarExpanded", "DataMatrix", "EAN8",
+                            "EAN13", "ITF", "MaxiCode", "PDF417", "QRCode",
+                            "UPCA", "UPCE", "MicroQRCode", "RMQRCode", "DXFilmEdge",
+                            "DataBarLimited", "LinearCodes", "MatrixCodes",
+                        ]
+                        Component.onCompleted: currentIndex = find("QRCode")
+                    }
 
-                TextArea {
-                    id: generateContentArea
-                    wrapMode: Text.WordWrap
-                    selectByMouse: true
-                    padding: 0
-                    placeholderText: "Enter content"
-                    Material.containerStyle: Material.Filled
-                }
-            }
-            Button {
-                id: qrGenerateButton
-                icon.source: "images/qr_code_2.svg"
-                text: "Generate"
-                highlighted: true
-                Material.background: Material.Pink
-                onClicked: {
-                    const content = generateContentArea.text
-                    if (content) {
-                        const s = Julia.barcode_display(generatedImageDisp, content, barcodeFormats.currentText)
-                        generatedImageDisp.height = s[0]
-                        generatedImageDisp.width = s[1]
-                        qrDownloadButton.visible = true
-                    } else {
-                        emptyContentDialog.open()
+                    ScrollView {
+                        enabled: !generateRoot.hasImage
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        background: Rectangle {
+                            color: Qt.alpha(Material.accent, 0.05)
+                            radius: 8
+                        }
+
+                        TextArea {
+                            id: generateContentArea
+                            placeholderText: "Type content here..."
+                            // enabled: !generateRoot.hasImage
+                            wrapMode: Text.WordWrap
+                            selectByMouse: true
+                            font.pixelSize: 14
+                            leftPadding: 12
+                            rightPadding: 12
+                        }
                     }
                 }
-            }
-            Button {
-                id: qrDownloadButton
-                icon.source: "images/download.svg"
-                text: "Save"
-                visible: false
-                highlighted: true
-                Material.background: Material.Pink
-                onClicked: {
-                    generatedImageSaveDialog.open()
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+
+                    Item { Layout.fillWidth: true } // Spacer
+
+                    Button {
+                        id: barcodeClearButton
+                        text: "Clear"
+                        visible: generateRoot.hasImage
+                        highlighted: true
+                        Material.background: Material.Orange
+                        icon.source: "images/close.svg"
+                        onClicked: {
+                            Julia.clear_julia_display(generatedImageDisp)
+                            generateContentArea.text = ""
+                            generateRoot.hasImage = false
+                        }
+                    }
+
+                    Button {
+                        id: barcodeDownloadButton
+                        text: "Save Image"
+                        visible: generateRoot.hasImage
+                        highlighted: true
+                        Material.background: Material.Teal
+                        icon.source: "images/download.svg"
+                        onClicked: generatedImageSaveDialog.open()
+                    }
+
+                    Button {
+                        id: barcodeGenerateButton
+                        text: "Generate"
+                        visible: !generateRoot.hasImage
+                        highlighted: true
+                        Material.background: Material.accent
+                        icon.source: "images/qr_code_2.svg"
+                        onClicked: {
+                            if (generateContentArea.text) {
+                                const s = Julia.barcode_display(generatedImageDisp, generateContentArea.text, barcodeFormats.currentText)
+                                generatedImageDisp.height = s[0]
+                                generatedImageDisp.width = s[1]
+                                generateRoot.hasImage = true
+                            } else {
+                                emptyContentDialog.open()
+                            }
+                        }
+                    }
                 }
             }
         }
