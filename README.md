@@ -35,10 +35,10 @@ Code128.
 Run following from Julia REPL
 ```julia
 using Pkg
-Pkg.add("QRStudio")
+Pkg.Apps.add("QRStudio")
 ```
 
 Launch application via terminal
 ```
-julia -m QRStudio
+QRStudio
 ```
