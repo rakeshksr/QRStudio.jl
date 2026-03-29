@@ -5,12 +5,17 @@ import QtQuick.Dialogs
 import QtQuick.Layouts
 import jlqml
 
+import "components"
+
 Pane {
     id: generateRoot
     Material.elevation: 0
     padding: 20
 
     property bool hasImage: false
+
+    EmptyContentDialog { id: emptyContentDialog }
+    Toast { id: toast }
 
     FileDialog {
         id: generatedImageSaveDialog
@@ -20,22 +25,11 @@ Pane {
         onAccepted: {
             generatedImageDisp.grabToImage(function(result) {
                 result.saveToFile(selectedFile);
+                toast.show("Barcode saved successfully!")
             })
         }
     }
 
-    Dialog {
-        id: emptyContentDialog
-        title: "Empty Content"
-        anchors.centerIn: parent
-        parent: Overlay.overlay
-        modal: true
-        standardButtons: Dialog.Ok
-        Label {
-            text: "Please enter some content to generate a barcode."
-            wrapMode: Text.WordWrap
-        }
-    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -102,10 +96,7 @@ Pane {
                         enabled: !generateRoot.hasImage
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        background: Rectangle {
-                            color: Qt.alpha(Material.accent, 0.05)
-                            radius: 8
-                        }
+                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
                         TextArea {
                             id: generateContentArea

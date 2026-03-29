@@ -3,6 +3,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Controls.Material
 
+import "components"
+
 Pane {
     id: settingsRoot
     padding: 0
@@ -38,83 +40,52 @@ Pane {
                 }
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: appearanceLayout.height + 40
-                radius: 16
-                color: Material.dialogColor
-                border.color: Material.dividerColor
+            SettingsCard {
+                title: "Appearance"
 
-                ColumnLayout {
-                    id: appearanceLayout
-                    anchors.centerIn: parent
-                    width: parent.width - 40
-                    spacing: 20
+                SettingItem {
+                    label: "Theme Mode"
+                    iconSource: "../images/routine.svg"
 
-                    Label {
-                        text: "Appearance"
-                        font.weight: Font.Medium
-                        font.pixelSize: 18
+                    ComboBox {
+                        id: themePicker
+                        model: ["System", "Light", "Dark"]
+                        Layout.preferredWidth: 150
+                        Component.onCompleted: currentIndex = indexOfValue(appSettings.themeMode)
+                        onActivated: (index) => appSettings.themeMode = textAt(index)
                     }
+                }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 16
-                        Image {
-                                source: "images/routine.svg"
-                            Layout.preferredWidth: 24; Layout.preferredHeight: 24
-                            opacity: 0.7
-                        }
-                        Label {
-                            text: "Theme Mode"
-                            Layout.fillWidth: true
-                        }
-                        ComboBox {
-                            id: themePicker
-                            model: ["System", "Light", "Dark"]
-                            Layout.preferredWidth: 150
-                            Component.onCompleted: currentIndex = indexOfValue(appSettings.themeMode)
-                            onActivated: (index) => appSettings.themeMode = textAt(index)
-                        }
-                    }
+                SettingItem {
+                    label: "Accent Color"
+                    showColorPreview: true
+                    previewColor: Material.accent
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 16
-                        Rectangle {
-                            width: 24; height: 24; radius: 12
-                            color: Material.accent
-                        }
-                        Label {
-                            text: "Accent Color"
-                            Layout.fillWidth: true
-                        }
-                        ComboBox {
-                            id: accentPicker
-                            model: [
-                                "Red", "Pink", "Purple", "DeepPurple", "Indigo", "Blue",
-                                "LightBlue", "Cyan", "Teal", "Green", "LightGreen",
-                                "Lime", "Yellow", "Amber", "Orange", "DeepOrange",
-                                "Brown", "Grey", "BlueGrey"
-                            ]
-                            Layout.preferredWidth: 150
-                            Component.onCompleted: currentIndex = indexOfValue(appSettings.accentColor)
-                            onActivated: (index) => appSettings.accentColor = textAt(index)
+                    ComboBox {
+                        id: accentPicker
+                        model: [
+                            "Red", "Pink", "Purple", "DeepPurple", "Indigo", "Blue",
+                            "LightBlue", "Cyan", "Teal", "Green", "LightGreen",
+                            "Lime", "Yellow", "Amber", "Orange", "DeepOrange",
+                            "Brown", "Grey", "BlueGrey"
+                        ]
+                        Layout.preferredWidth: 150
+                        Component.onCompleted: currentIndex = indexOfValue(appSettings.accentColor)
+                        onActivated: (index) => appSettings.accentColor = textAt(index)
 
-                            delegate: ItemDelegate {
-                                width: accentPicker.width
-                                contentItem: RowLayout {
-                                    spacing: 10
-                                    Rectangle {
-                                        width: 12; height: 12; radius: 6
-                                        color: Material.color(Material[modelData])
-                                    }
-                                    Text {
-                                        text: modelData
-                                        color: accentPicker.currentIndex === index ? Material.accent : Material.foreground
-                                        font.bold: accentPicker.currentIndex === index
-                                        elide: Text.ElideRight
-                                    }
+                        delegate: ItemDelegate {
+                            width: accentPicker.width
+                            contentItem: RowLayout {
+                                spacing: 10
+                                Rectangle {
+                                    width: 12; height: 12; radius: 6
+                                    color: Material.color(Material[modelData])
+                                }
+                                Text {
+                                    text: modelData
+                                    color: accentPicker.currentIndex === index ? Material.accent : Material.foreground
+                                    font.bold: accentPicker.currentIndex === index
+                                    elide: Text.ElideRight
                                 }
                             }
                         }
@@ -122,85 +93,22 @@ Pane {
                 }
             }
 
-            Rectangle {
+            SettingsCard {
+                title: "Behavior (Feature in Progress)"
                 enabled: false
-                Layout.fillWidth: true
-                implicitHeight: behaviorLayout.implicitHeight + 40
-                radius: 16
-                color: Material.dialogColor
-                border.color: Material.dividerColor
 
-                ColumnLayout {
-                    id: behaviorLayout
-                    anchors.centerIn: parent
-                    width: parent.width - 40
-                    spacing: 12
-
-                    Label {
-                        text: "Behavior(Feature in Progress)"
-                        font.weight: Font.Medium
-                        font.pixelSize: 18
-                        Layout.bottomMargin: 8
-                    }
-
-                    DescriptionSwitch {
-                        text: "Save Scan History"
-                        Layout.fillWidth: true
-                        checked: false
-                        description: "Keep a local record of detected codes."
-                    }
-
-                    DescriptionSwitch {
-                        text: "Auto-detect URLs"
-                        Layout.fillWidth: true
-                        checked: false
-                        description: "Automatically open links in browser when scanned."
-                    }
-                }
-            }
-        }
-    }
-
-    component DescriptionSwitch : Switch {
-        id: sw
-        property string description: ""
-
-        topPadding: 12
-        bottomPadding: 12
-        leftPadding: 0
-
-        contentItem: RowLayout {
-            spacing: 0
-            width: sw.width
-
-            Item {
-                Layout.preferredWidth: 64
-                Layout.fillHeight: true
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 2
-
-                Label {
-                    text: sw.text
-                    font.pixelSize: 16
-                    font.weight: sw.checked ? Font.DemiBold : Font.Normal
-                    color: sw.checked ? Material.accent : Material.foreground
-
+                DescriptionSwitch {
+                    text: "Save Scan History"
                     Layout.fillWidth: true
-                    elide: Text.ElideRight
+                    checked: false
+                    description: "Keep a local record of detected codes."
                 }
 
-                Label {
-                    text: sw.description
-                    font.pixelSize: 13
-                    color: Material.secondaryTextColor
-                    visible: text !== ""
-
+                DescriptionSwitch {
+                    text: "Auto-detect URLs"
                     Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    opacity: 0.8
+                    checked: false
+                    description: "Automatically open links in browser when scanned."
                 }
             }
         }
