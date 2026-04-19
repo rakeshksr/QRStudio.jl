@@ -19,7 +19,7 @@ FileIO = "1.18.0"
 ImageCore = "0.10.5"
 ImageIO = "0.6.9"
 ImageShow = "0.3.8"
-QML = "0.12.1"
+QML = "0.12.1, 0.13"
 ZXingCPP = "0.5.0"
 julia = "1.10.10"
 
