@@ -19,8 +19,6 @@ import ZXingCPP:
     CreatorOptions,
     WriterOptions,
     ZXing_BarcodeFormat,
-    ZXing_BarcodeFormatFromString,
-    ZXing_BarcodeFormatToString,
     ZXing_BarcodeFormat_QRCode,
     format,
     position,
@@ -62,7 +60,7 @@ function create_barcode_image(content::String, barcode_format::ZXing_BarcodeForm
 end
 
 function create_barcode_image(content::String, barcode_format::String; kwargs...)
-    fmt = ZXing_BarcodeFormatFromString(barcode_format)
+    fmt = ZXing_BarcodeFormat(barcode_format)
     return create_barcode_image(content, fmt; kwargs...)
 end
 
@@ -90,7 +88,7 @@ function detect(image_path::AbstractString)
     result = []
     for bc in bcs
         content = text(bc)
-        fmt = unsafe_string(ZXing_BarcodeFormatToString(format(bc)))
+        fmt = string(format(bc))
         pos = position(bc)
         # To-Do replace Array with Struct
         # det = Detection(
