@@ -1,6 +1,6 @@
 name = "QRStudio"
 uuid = "6020892f-701e-4efe-8b55-f26b30257e50"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["rakeshksr <rakeshksr@users.noreply.github.com>"]
 
 [deps]
