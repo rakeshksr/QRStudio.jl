@@ -13,6 +13,9 @@ Pane {
     padding: 20
 
     property bool hasImage: false
+    property int imageWidth: 0
+    property int imageHeight: 0
+    property string imageSource: ""
 
     EmptyContentDialog { id: emptyContentDialog }
     Toast { id: toast }
@@ -23,10 +26,11 @@ Pane {
         nameFilters: ["PNG files (*.png)"]
 
         onAccepted: {
-            generatedImageDisp.grabToImage(function(result) {
-                result.saveToFile(selectedFile);
+            if (Julia.save_generated_barcode(selectedFile)) {
                 toast.show("Barcode saved successfully!")
-            })
+            } else {
+                toast.show("No barcode image to save")
+            }
         }
     }
 
@@ -54,10 +58,16 @@ Pane {
                 font.pixelSize: 16
             }
 
-            JuliaDisplay {
-                id: generatedImageDisp
+            Image {
+                id: generatedImage
                 anchors.centerIn: parent
-                // The size is dynamically set by Julia
+                width: generateRoot.imageWidth
+                height: generateRoot.imageHeight
+                source: generateRoot.imageSource
+                sourceSize.width: generateRoot.imageWidth
+                sourceSize.height: generateRoot.imageHeight
+                fillMode: Image.PreserveAspectFit
+                cache: false
                 opacity: generateRoot.hasImage ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: 250 } }
             }
@@ -125,8 +135,10 @@ Pane {
                         Material.background: Material.Orange
                         icon.source: "images/close.svg"
                         onClicked: {
-                            Julia.clear_julia_display(generatedImageDisp)
                             generateContentArea.text = ""
+                            generateRoot.imageSource = ""
+                            generateRoot.imageWidth = 0
+                            generateRoot.imageHeight = 0
                             generateRoot.hasImage = false
                         }
                     }
@@ -150,9 +162,10 @@ Pane {
                         icon.source: "images/qr_code_2.svg"
                         onClicked: {
                             if (generateContentArea.text) {
-                                const s = Julia.barcode_display(generatedImageDisp, generateContentArea.text, barcodeFormats.currentText)
-                                generatedImageDisp.height = s[0]
-                                generatedImageDisp.width = s[1]
+                                const s = Julia.generate_barcode_image(generateContentArea.text, barcodeFormats.currentText)
+                                generateRoot.imageWidth = s[0]
+                                generateRoot.imageHeight = s[1]
+                                generateRoot.imageSource = s[2]
                                 generateRoot.hasImage = true
                             } else {
                                 emptyContentDialog.open()

@@ -1,16 +1,20 @@
 module QRStudio
 
-import FileIO: load
-import ImageCore: N0f8, RGBA
+import FileIO: load, save
+import ImageCore: Gray, N0f8
 import ImageIO
-import ImageShow
 
 import QML:
     @qmlfunction,
-    JuliaDisplay,
+    Format_RGB888,
+    Image,
+    ImageProvider,
+    QImage,
     QString,
     QUrlAllocated,
+    addImageProvider,
     exec,
+    init_qmlapplicationengine,
     loadqml,
     toLocalFile
 
@@ -29,6 +33,13 @@ import ZXingCPP:
 QML_DIR = Base.pkgdir(@__MODULE__, "qml")
 # QML_DIR = joinpath(dirname(@__DIR__), "qml")
 
+const BARCODE_PROVIDER_NAME = "barcodes"
+const EMPTY_PREVIEW_SIZE = 300
+const _barcode_buffer = Ref(Vector{UInt8}())
+const _barcode_width = Ref(EMPTY_PREVIEW_SIZE)
+const _barcode_height = Ref(EMPTY_PREVIEW_SIZE)
+const _barcode_revision = Ref(0)
+const _latest_barcode_image = Ref{Union{Nothing, Matrix{Gray{N0f8}}}}(nothing)
 
 # @kwdef struct Detection
 #     content::String
@@ -65,16 +76,63 @@ function create_barcode_image(content::String, barcode_format::String; kwargs...
 end
 
 
-function barcode_display(d::JuliaDisplay, content::QString, barcode_format::QString)
-    img = create_barcode_image(String(content), String(barcode_format))
-    h, w = size(img)
-    display(d, img)
-    return [h, w]
+function make_qimage_rgb888_buffer(img::AbstractMatrix{Gray{N0f8}})
+    height, width = size(img)
+    bytes_per_line = 3 * width
+    buffer = Vector{UInt8}(undef, height * bytes_per_line)
+
+    @inbounds for y in 1:height
+        row_offset = (y - 1) * bytes_per_line
+        for x in 1:width
+            value = reinterpret(UInt8, img[y, x].val)
+            pixel_offset = row_offset + 3 * (x - 1)
+            buffer[pixel_offset + 1] = value
+            buffer[pixel_offset + 2] = value
+            buffer[pixel_offset + 3] = value
+        end
+    end
+
+    return buffer, width, height
 end
 
-function clear_julia_display(d::JuliaDisplay)
-    empty_img = zeros(RGBA{N0f8}, 300, 300)
-    return display(d, empty_img)
+function make_qimage_rgb888_buffer(img::AbstractMatrix)
+    return make_qimage_rgb888_buffer(Gray{N0f8}.(img))
+end
+
+function set_barcode_buffer!(buffer::Vector{UInt8}, width::Integer, height::Integer)
+    _barcode_buffer[] = buffer
+    _barcode_width[] = Int(width)
+    _barcode_height[] = Int(height)
+    _barcode_revision[] += 1
+    return "image://$(BARCODE_PROVIDER_NAME)/current?rev=$(_barcode_revision[])"
+end
+
+function generate_barcode_image(content::QString, barcode_format::QString)
+    img = create_barcode_image(String(content), String(barcode_format))
+    _latest_barcode_image[] = Gray{N0f8}.(img)
+    buffer, width, height = make_qimage_rgb888_buffer(img)
+    source = set_barcode_buffer!(buffer, width, height)
+    return [width, height, source]
+end
+
+function save_generated_barcode(path::AbstractString)
+    image = _latest_barcode_image[]
+    image === nothing && return false
+    save(path, image)
+    return true
+end
+
+function save_generated_barcode(path::QString)
+    return save_generated_barcode(String(path))
+end
+
+function save_generated_barcode(url::QUrlAllocated)
+    return save_generated_barcode(toLocalFile(url))
+end
+
+function barcode_image_callback(_, _, _)
+    image = QImage(pointer(_barcode_buffer[]), _barcode_width[], _barcode_height[], 3 * _barcode_width[], Format_RGB888)
+    return deepcopy(image), _barcode_width[], _barcode_height[]
 end
 
 function detect(url::QUrlAllocated)
@@ -123,12 +181,15 @@ end
 
 function (@main)(ARGS)
 
-    @qmlfunction detect barcode_display clear_julia_display
+    @qmlfunction detect generate_barcode_image save_generated_barcode
 
     qml_file = joinpath(QML_DIR, "main.qml")
+    set_barcode_buffer!(fill(UInt8(255), EMPTY_PREVIEW_SIZE * EMPTY_PREVIEW_SIZE * 3), EMPTY_PREVIEW_SIZE, EMPTY_PREVIEW_SIZE)
+    engine = init_qmlapplicationengine()
+    addImageProvider(engine, BARCODE_PROVIDER_NAME, ImageProvider(Image, barcode_image_callback))
     # detectionsModel = JuliaItemModel(detections)
     # loadqml(qml_file; detectionsModel)
-    loadqml(qml_file)
+    loadqml(engine, qml_file)
 
     return exec()
 end
