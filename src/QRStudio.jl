@@ -9,8 +9,10 @@ import QML:
     @qmlfunction,
     JuliaDisplay,
     QString,
+    QUrlAllocated,
     exec,
-    loadqml
+    loadqml,
+    toLocalFile
 
 import ZXingCPP:
     Barcode,
@@ -77,6 +79,10 @@ function clear_julia_display(d::JuliaDisplay)
     return display(d, empty_img)
 end
 
+function detect(url::QUrlAllocated)
+    path = toLocalFile(url)
+    return detect(path)
+end
 
 function detect(image_path::AbstractString)
     img = load(image_path)

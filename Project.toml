@@ -11,9 +11,6 @@ ImageShow = "4e3cecfd-b093-5904-9786-8bbb286a6a31"
 QML = "2db162a6-7e43-52c3-8d84-290c1c42d82a"
 ZXingCPP = "ffcb3a2f-c869-4483-b5bf-82d7b239c77e"
 
-[apps]
-QRStudio = {}
-
 [compat]
 FileIO = "1.19.0"
 ImageCore = "0.10.5"
@@ -22,6 +19,8 @@ ImageShow = "0.3.8"
 QML = "0.13.0"
 ZXingCPP = "0.6.0"
 julia = "1.10.11"
+
+[apps.QRStudio]
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

@@ -1,10 +1,5 @@
 .pragma library
 
-function toLocalFile(url) {
-	// To-Do remove when QUrl::toLocalFile() avaiable
-	return decodeURIComponent(url).replace(/^(file:\/{2,3})/, "");
-}
-
 function isImageFile(url) {
 	return url
 		.toString()
@@ -58,8 +53,7 @@ function detectImages(
 		scanRoot.activeIndex = -1;
 
 		for (const url of urls) {
-			const imagePath = toLocalFile(url);
-			const detections = Julia.detect(imagePath);
+			const detections = Julia.detect(url);
 			const imageDetections = [];
 			// To-Do replace detections array with julia struct
 			for (const detection of detections) {
