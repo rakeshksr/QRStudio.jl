@@ -20,8 +20,6 @@ import QML:
 
 import ZXingCPP:
     Barcode,
-    CreatorOptions,
-    WriterOptions,
     ZXing_BarcodeFormat,
     ZXing_BarcodeFormat_QRCode,
     format,
@@ -55,17 +53,14 @@ const _latest_barcode_image = Ref{Union{Nothing, Matrix{Gray{N0f8}}}}(nothing)
 # end
 
 function create_barcode_image(content::String, barcode_format::ZXing_BarcodeFormat; kwargs...)
-    co = CreatorOptions(barcode_format)
-    bc = Barcode(content, co)
+    bc = Barcode(content, barcode_format)
 
     scale = if barcode_format == ZXing_BarcodeFormat_QRCode
         10
     else
         3
     end
-    wo = WriterOptions(; scale = scale)
-    # wo = WriterOptions(; kwargs...)
-    zimg = write_barcode_to_image(bc, wo)
+    zimg = write_barcode_to_image(bc, scale=scale)
     img = Matrix(zimg)
     return img
 end
